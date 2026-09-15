@@ -1,11 +1,12 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+
 <package format="3">
   <name>atide_fault_trigger</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="lelelapini1@gmail.com">lele</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Fault injection node for A.T.I.D.E. - Simulates LiDAR faults between Gazebo and Nav2</description>
+  <maintainer email="lelelapini1@gmail.com">Gabriele Lapini</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -13,6 +14,9 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>rcl_interfaces</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

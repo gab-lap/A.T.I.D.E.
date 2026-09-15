@@ -12,6 +12,27 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 
+# Create an executable for the fault trigger node
+add_executable(fault_trigger_node src/fault_trigger_node.cpp)
+
+# Add dependencies to the executable
+ament_target_dependencies(fault_trigger_node 
+  rclcpp 
+  sensor_msgs 
+  std_msgs 
+  rcl_interfaces
+)
+
+# Install the executable
+install(TARGETS fault_trigger_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install launch files
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}/
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

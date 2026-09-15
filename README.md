@@ -1,4 +1,4 @@
-# A.T.I.D.E. — Diagnostics Agent
+# A.T.I.D.E. - Autonomous & Teleoperated Intervention in Degraded Environments
 
 A diagnostics subsystem for autonomous rovers operating in degraded environments. Built for the [Nebius x NVIDIA Global AI Hackathon](https://nebiusglobalaihackathon.devpost.com/) (Physical AI Track).
 
