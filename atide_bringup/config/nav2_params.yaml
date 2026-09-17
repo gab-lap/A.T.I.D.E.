@@ -1,0 +1,50 @@
+# NOTE: no `amcl:` block here anymore. navigation_launch.py (used in
+# simulation.launch.py) does not start AMCL or map_server — a static
+# identity transform from `map` to `odom` stands in for real localization,
+# which is sufficient for a single known start pose in one corridor. If you
+# ever need the rover to navigate multiple runs from unknown start poses
+# against a saved map, that's when real AMCL + a map file become necessary,
+# and this file would need the amcl block back plus a map_server launch entry.
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: True
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: True
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 3
+      height: 3
+      resolution: 0.05
+      robot_radius: 0.22
+      observation_sources: scan
+      scan:
+        topic: /scan_filtered
+        max_obstacle_height: 2.0
+        clearing: true
+        marking: true
+        data_type: "LaserScan"
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: True
+      global_frame: map
+      robot_base_frame: base_link
+      robot_radius: 0.22
+      resolution: 0.05
+      track_unknown_space: true
+      observation_sources: scan
+      scan:
+        topic: /scan_filtered
+        max_obstacle_height: 2.0
+        clearing: true
+        marking: true
+        data_type: "LaserScan"

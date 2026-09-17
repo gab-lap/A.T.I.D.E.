@@ -1,0 +1,35 @@
+# VERIFY BEFORE TRUSTING: run `gz topic -l` after Gazebo + the spawned robot
+# are both up, and confirm these gz_topic_name values actually match reality.
+# Gazebo often namespaces topics under the world name (e.g.
+# /world/atide_tunnel/clock instead of /clock) — the exact strings depend on
+# the world name and on whatever <topic> tags TurtleBot3's own xacro/plugins
+# declare. Don't assume this generic template is exactly right for this
+# specific world+robot combination without checking.
+
+# Clock bridge: Gazebo simulation time -> ROS 2 /clock
+- ros_topic_name: "/clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+# LiDAR bridge: Gazebo raycaster -> ROS 2 /scan
+- ros_topic_name: "/scan"
+  gz_topic_name: "/scan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  gz_type_name: "gz.msgs.LaserScan"
+  direction: GZ_TO_ROS
+
+# Velocity Command bridge: ROS 2 /cmd_vel -> Gazebo differential drive plugin
+- ros_topic_name: "/cmd_vel"
+  gz_topic_name: "/cmd_vel"
+  ros_type_name: "geometry_msgs/msg/Twist"
+  gz_type_name: "gz.msgs.Twist"
+  direction: ROS_TO_GZ
+
+# Odometry bridge: Gazebo wheel encoder model -> ROS 2 /odom
+- ros_topic_name: "/odom"
+  gz_topic_name: "/odom"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: GZ_TO_ROS
