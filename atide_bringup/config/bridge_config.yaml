@@ -1,10 +1,4 @@
-# VERIFY BEFORE TRUSTING: run `gz topic -l` after Gazebo + the spawned robot
-# are both up, and confirm these gz_topic_name values actually match reality.
-# Gazebo often namespaces topics under the world name (e.g.
-# /world/atide_tunnel/clock instead of /clock) — the exact strings depend on
-# the world name and on whatever <topic> tags TurtleBot3's own xacro/plugins
-# declare. Don't assume this generic template is exactly right for this
-# specific world+robot combination without checking.
+# This file defines the topic bridges between Gazebo and ROS 2 for the A.T.I.D.E. robot.
 
 # Clock bridge: Gazebo simulation time -> ROS 2 /clock
 - ros_topic_name: "/clock"
