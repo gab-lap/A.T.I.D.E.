@@ -2,6 +2,7 @@ import os
 import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import SetEnvironmentVariable
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
@@ -12,13 +13,15 @@ def generate_launch_description():
     # Create paths to files in other packages, so we can pass them to nodes as arguments
     pkg_atide_bringup = get_package_share_directory('atide_bringup')
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
-    pkg_turtlebot3_desc = get_package_share_directory('turtlebot3_description')
+    #pkg_turtlebot3_desc = get_package_share_directory('turtlebot3_description')
     pkg_nav2_bringup = get_package_share_directory('nav2_bringup')
+    pkg_turtlebot3_gz = get_package_share_directory('turtlebot3_gazebo')
 
     # Create paths to files in this package, so we can pass them to nodes as arguments
     world_path = os.path.join(pkg_atide_bringup, 'worlds', 'tunnel.sdf')
     bridge_config_path = os.path.join(pkg_atide_bringup, 'config', 'bridge_config.yaml')
     nav2_params_path = os.path.join(pkg_atide_bringup, 'config', 'nav2_params.yaml')
+    gz_model_path = os.path.join(pkg_turtlebot3_gz, 'models', 'turtlebot3_waffle', 'model.sdf')
 
     # If you want to use xacro to process the URDF, uncomment the following lines.  
     # The turtlebot3 package ships with a .xacro file, but it is not installed in the final package, 
@@ -32,9 +35,15 @@ def generate_launch_description():
 
     # Developers of the turtlebot3 package chose to ship the precompiled .urdf files in the final installation
     # so we can just read it directly instead of using xacro to process it.
-    urdf_path = os.path.join(pkg_turtlebot3_desc, 'urdf', 'turtlebot3_waffle.urdf')
+    urdf_path = os.path.join(pkg_turtlebot3_gz, 'urdf', 'turtlebot3_waffle.urdf')
     with open(urdf_path, 'r') as infp:
         robot_desc = infp.read()
+
+    # Set the GZ_SIM_RESOURCE_PATH environment variable to point to the turtlebot3_gz models directory
+    set_gz_resource_path = SetEnvironmentVariable(
+        'GZ_SIM_RESOURCE_PATH',
+        os.path.join(pkg_turtlebot3_gz, 'models'),
+    )
 
     # Start Gazebo Harmonic with tunnel.sdf
     gazebo = IncludeLaunchDescription(
@@ -57,7 +66,7 @@ def generate_launch_description():
         package='ros_gz_sim',
         executable='create',
         arguments=[
-            '-string', robot_desc,
+            '-file', gz_model_path,
             '-name', 'waffle',
             '-x', '1.0',
             '-y', '0.0',
@@ -94,6 +103,16 @@ def generate_launch_description():
         arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
     )
 
+    # Fakes the odom -> base_footprint transform that the
+    # Gazebo diff-drive plugin would normally publish. Needed because
+    # turtlebot3_description's URDF has no <gazebo> plugin blocks.
+    odom_to_base_footprint = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='odom_to_base_footprint_static_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'odom', 'base_footprint'],
+    )
+
     # navigation_launch.py (not bringup_launch.py) is used
     # deliberately - it starts the planner/controller/behavior servers and
     # the lifecycle manager, WITHOUT AMCL/map_server, matching the fake-map
@@ -110,11 +129,13 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        set_gz_resource_path,
         gazebo,
         robot_state_publisher,
         spawn_rover,
         bridge,
         fault_trigger,
         map_to_odom,
+        odom_to_base_footprint,
         nav2,
     ])
