@@ -1,5 +1,5 @@
 import os
-import xacro
+# import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import SetEnvironmentVariable
@@ -18,6 +18,7 @@ def generate_launch_description():
     pkg_turtlebot3_gz = get_package_share_directory('turtlebot3_gazebo')
 
     # Create paths to files in this package, so we can pass them to nodes as arguments
+    rviz_config_path = os.path.join(pkg_atide_bringup, 'config', 'atide_rviz.rviz')
     world_path = os.path.join(pkg_atide_bringup, 'worlds', 'tunnel.sdf')
     bridge_config_path = os.path.join(pkg_atide_bringup, 'config', 'bridge_config.yaml')
     nav2_params_path = os.path.join(pkg_atide_bringup, 'config', 'nav2_params.yaml')
@@ -103,16 +104,6 @@ def generate_launch_description():
         arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
     )
 
-    # Fakes the odom -> base_footprint transform that the
-    # Gazebo diff-drive plugin would normally publish. Needed because
-    # turtlebot3_description's URDF has no <gazebo> plugin blocks.
-    odom_to_base_footprint = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='odom_to_base_footprint_static_tf',
-        arguments=['0', '0', '0', '0', '0', '0', 'odom', 'base_footprint'],
-    )
-
     # navigation_launch.py (not bringup_launch.py) is used
     # deliberately - it starts the planner/controller/behavior servers and
     # the lifecycle manager, WITHOUT AMCL/map_server, matching the fake-map
@@ -128,6 +119,15 @@ def generate_launch_description():
         }.items(),
     )
 
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', rviz_config_path],
+        parameters=[{'use_sim_time': True}],
+    )
+
     return LaunchDescription([
         set_gz_resource_path,
         gazebo,
@@ -136,6 +136,6 @@ def generate_launch_description():
         bridge,
         fault_trigger,
         map_to_odom,
-        odom_to_base_footprint,
         nav2,
+        rviz,
     ])
