@@ -58,8 +58,8 @@ class DiagnosticsAgentNode(Node):
 
         # --- Publishers and Subscribers ---
         self.severity_sub = self.create_subscription(String, self.severity_topic, self.on_severity, 10)
-        self.decision_pub = self.create_publisher(String, self.decision_topic, 10)
 
+        self.decision_pub = self.create_publisher(String, self.decision_topic, 10)
         self.rationale_pub = self.create_publisher(String, '/recovery_rationale', 10)   # For the visual Demo
         self.trace_pub = self.create_publisher(String, '/reasoning_trace', 10)          # 
 
@@ -78,21 +78,47 @@ class DiagnosticsAgentNode(Node):
 
         severity = msg.data
         previous = self.last_severity
-        self.last_severity = severity
 
         if severity == 'none':
+            self.last_severity = severity
             return
         if severity == previous:
             return
         if self.decision_in_flight:
             self.get_logger().warn('Fault changed while a decision was in flight - ignoring')
             return
-
+        
+        self.last_severity = severity
         self.handle_fault(severity)
 
         
     def handle_fault(self, severity: str):
-        pass
+        """
+        Handles faults querying Tavily and Nemotron
+        """
+
+        self.decision_in_flight = True
+
+        try:
+            self.get_logger().info(f'=== FAULT DETECTED: {severity} ===')
+
+            context = self.retrieve_contex(severity)
+            self.get_logger().info(f'--- TAVILY CONTEXT --- \n{context}\n')
+
+            reasoning, decision, rationale = self.query_model(severity, context)
+            self.get_logger().info(f'--- NEMOTRON REASONING --- \n{reasoning}\n')
+            self.get_logger().info(f'=== NEMOTRON DECISION: {decision} ===')
+            self.get_logger().info(f'--- NEMOTRON RATIONALE: {rationale} ---')
+
+            self.publish(self.decision_pub, decision)
+            self.publish(self.rationale_pub, rationale)
+            self.publish(self.trace_pub, reasoning)
+
+        except Exception as exc:
+            self.get_logger().error(f"Diagnostics FAILED ({exc}) --- falling back to 'HALT'")
+            self.publish(self.decision_pub, 'HALT')
+        finally:
+            self.decision_in_flight = False
 
 
     def retrieve_contex(self, severity: str):
@@ -111,6 +137,11 @@ class DiagnosticsAgentNode(Node):
 
 
     def query_model(self, severity: str, context: str):
+        """
+        Queries Nemotron and retrieves a decision (among the ones in the vocabulary),
+        the reasoning (thought process) and the rationale
+        """
+
         options = ' | '.join(self.vocabulary)
         prompt = (
             f'A mobile robot navigating a confined tunnel has a LiDAR fault.\n'
@@ -120,9 +151,9 @@ class DiagnosticsAgentNode(Node):
             f'  - "complete" means no scan data at all.\n\n'
             f'Retrieved ROS 2 guidance:\n{context}\n\n'
             f'Choose exactly one action: {options}\n\n'
-            f'Respond in this format and nothing else:\n'
-            f'Line 1: the action, exactly as written above.\n'
-            f'Lines 2+: a brief rationale.'
+            f'Your response must start with exactly one action on its own line, '
+            f'with nothing before it. The action must be one of: {options}\n'
+            f'After that line, provide a brief rationale in one or two sentences.'
         )
 
         response = self.nebius_client.chat.completions.create(
@@ -160,6 +191,10 @@ class DiagnosticsAgentNode(Node):
 
 
     def publish(self, publisher, text: str):
+        """
+        Helper function to simplify the publishing process
+        """
+
         msg = String()
         msg.data = text
         publisher.publish(msg)
