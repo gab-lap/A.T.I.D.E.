@@ -13,10 +13,12 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='lele',
+    maintainer='Gabriele Lapini',
     maintainer_email='lelelapini1@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='Retrieval-augmented fault diagnosis for A.T.I.D.E. — watches fault state, '
+                'reasons about recovery with Tavily + Nemotron via Nebius Token Factory. '
+                'First iteration subscribes and logs only.',
+    license='MIT',
     extras_require={
         'test': [
             'pytest',
@@ -24,6 +26,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'diagnostics_agent_node = atide_diagnostics_agent.diagnostics_agent_node:main',
         ],
     },
 )

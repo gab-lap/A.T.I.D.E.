@@ -89,8 +89,7 @@ private:
     }
   }
 
-  rcl_interfaces::msg::SetParametersResult on_parameter_change(
-    const std::vector<rclcpp::Parameter> & params)
+  rcl_interfaces::msg::SetParametersResult on_parameter_change(const std::vector<rclcpp::Parameter> & params)
   {
     auto result = rcl_interfaces::msg::SetParametersResult();
     result.successful = true;

@@ -3,12 +3,15 @@
 <package format="3">
   <name>atide_diagnostics_agent</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="lelelapini1@gmail.com">lele</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Retrieval-augmented fault diagnosis for A.T.I.D.E. -- watches fault state, reasons about recovery with Tavily + Nemotron via Nebius Token Factory. This first iteration only subscribes and logs, to prove the package structure before adding external API calls.</description>
+  <maintainer email="lelelapini1@gmail.com">Gabriele Lapini</maintainer>
+  <license>MIT</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
