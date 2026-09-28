@@ -15,9 +15,10 @@ setup(
     zip_safe=True,
     maintainer='Gabriele Lapini',
     maintainer_email='lelelapini1@gmail.com',
-    description='Retrieval-augmented fault diagnosis for A.T.I.D.E. — watches fault state, '
-                'reasons about recovery with Tavily + Nemotron via Nebius Token Factory. '
-                'First iteration subscribes and logs only.',
+    description='Retrieval-augmented fault diagnosis for A.T.I.D.E. — watches fault '
+                'state, retrieves ROS 2 recovery guidance via Tavily, reasons about the '
+                'best action with NVIDIA Nemotron 3 Nano on Nebius Token Factory, and '
+                'publishes the decision plus its full reasoning trace.',
     license='MIT',
     extras_require={
         'test': [
