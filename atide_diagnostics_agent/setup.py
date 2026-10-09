@@ -28,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'diagnostics_agent_node = atide_diagnostics_agent.diagnostics_agent_node:main',
+            'baseline_agent_node = atide_diagnostics_agent.baseline_agent_node:main',
         ],
     },
 )

@@ -1,0 +1,89 @@
+ Container atide-demo-1 Recreate 
+ Container atide-demo-1 Recreated 
+Attaching to demo-1
+ Container atide-demo-1 Starting 
+ Container atide-demo-1 Started 
+demo-1  | [INFO] [1791562409.744320195] [baseline_agent_node]: baseline_agent_node up (rule: any fault -> HALT, /fault_severity -> /baseline_decision)
+demo-1  | [INFO] [1791562410.212129012] [diagnostics_agent_node]: Diagnostics agent Node up. Model: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B, Vocabulary: ['RETRY_NAVIGATION', 'REVERSE_AND_REPLAN', 'HALT'], Watching: /fault_severity
+demo-1  | 
+demo-1  | ================ injecting fault: intermittent ================
+demo-1  | [INFO] [1791562415.725067778] [diagnostics_agent_node]: === FAULT DETECTED: intermittent ===
+demo-1  | [INFO] [1791562415.725226618] [baseline_agent_node]: [BASELINE] severity=intermittent -> HALT
+demo-1  | [INFO] [1791562417.496430194] [diagnostics_agent_node]: --- TAVILY CONTEXT --- 
+demo-1  | --> Running ROS 2 on a UBR-1 for autonomous navigation: One of the biggest changes in ROS 2 is the use of behavior trees to structure the recovery behaviors and connect the various action-based interfaces. This allows quite a bit of interesting new functionality, such as using different recovery behaviors for controller failures than are used for planning failures and allowing quite a bit of control over when to plan. There are already dozens of behavior tree nodes and there is also a new tutorial on writing custom behavior tree nodes. [...] After the HBRC failures, I decided to port the FetchDepthlayer to ROS 2. You can find it in the ubr1\_navigation package. The initial port was pretty straightforward. The costmap\_2d package hasn’t gotten too many updates, other than a nav2 prefix for the package and namespaces. [...] One interesting find was that the sensor\_msgs/PointCloud message has been deprecated and slated for removal after Foxy. There are a number of places where the PointCloud interface was used a simple way to publish debug points (the message is simply an array of geometry\_msgs/Point32 instead of the much more complicated PointCloud2 messages which has a variable set of fields and pretty much requires the use of a modifier and iterator to really fill or read). I decided to get rid of the
+demo-1  | --> 32. ROS2-Autonomous Navigation Course | PuppyPi Documentation: The Nav2 project builds upon and extends the spirit of the ROS navigation stack. Its goal is to enable mobile robots to move safely from point A to point B. Nav2 can also be applied to other scenarios, including robot navigation and dynamic point tracking. During this process, tasks such as dynamic path planning, motor speed calculation, obstacle avoidance, and recovery behaviors need to be completed. [...] ③ Recovery Server: The Recovery Server acts as a fault-tolerant system. Its goal is to handle unexpected situations or failures and autonomously resolve these issues. For example, if the robot falls into a pit during navigation, the recovery server helps it find a way to recover and continue its task. [...] Nav2 uses behavior trees to call modular servers to perform actions. These actions may include path computation, force control, recovery, or any other navigation-related tasks. These actions are executed through independent nodes that communicate with the behavior tree (BT) via ROS Action servers. The diagram below provides an overview of Nav2's architecture:
+demo-1  | 
+demo-1  | The above architecture can be broadly divided into one major component and three smaller components.
+demo-1  | 
+demo-1  | (1) The Major Component:
+demo-1  | --> How to Set Up Autonomous Navigation on Leo Rover with ROS 2 & Nav2 | Fictionlab Documentation: Before you start configuring the navigation, it's a good idea to verify that
+demo-1  | your sensors are working correctly and publishing data. LiDAR sensors should be
+demo-1  | publishing scan data on the ROS topic (`leo_nav` package uses `/scan` as
+demo-1  | default), and the stereo camera (if used) should be publishing either depth data
+demo-1  | (`/oak/stereo/image_raw` by default) or pointcloud data (`/oak/points` by
+demo-1  | default). If there is no data being published, you should check the sensor [...] If you have LiDAR scans on a different topic than `/scan`, you will need to
+demo-1  | remap it When launching SLAM Toolbox:
+demo-1  | 
+demo-1  | `/scan`
+demo-1  | `ros2 launch leo_nav slam_toolbox.launch.py scan_topic:=/your_lidar_topic`
+demo-1  | 
+demo-1  | The SLAM Toolbox node takes as the input:
+demo-1  | 
+demo-1  | `/scan`
+demo-1  | `base_footprint -> laser_frame`
+demo-1  | `odom -> base_footprint`
+demo-1  | 
+demo-1  | As the output, it publishes:
+demo-1  | 
+demo-1  | `/map`
+demo-1  | `/map_metadata`
+demo-1  | `map->odom` [...] If your sensors don't operate on the default topics, you will need to remap them
+demo-1  | when using the navigation software. All the sensor topics can be remapped by
+demo-1  | passing appropriate arguments to the launch file. This can
+demo-1  | be done when launching the navigation software from CLI or by creating a custom
+demo-1  | launch file, which can be similar to the one below:
+demo-1  | 
+demo-1  | `<launch>
+demo-1  | 
+demo-1  | <include file="$(find-pkg-share leo_nav)/launch/navigation.launch.xml">
+demo-1  | 
+demo-1  | <arg name="scan_topic" value="/my_scan" />
+demo-1  | 
+demo-1  | [INFO] [1791562418.233429046] [diagnostics_agent_node]: --- NEMOTRON REASONING --- 
+demo-1  | We need to output exactly one action on its own line, with nothing before it. Then after that line, provide a brief rationale in one or two sentences. The action must be one of: RETRY_NAVIGATION | REVERSE_AND_REPLAN | HALT.
+demo-1  | 
+demo-1  | We need to choose appropriate action based on context: mobile robot navigating a confined tunnel has a LiDAR fault intermittent. The fault severity: intermittent means scans arrive sparsely but navigation data is partially available. So robot can still navigate but with degraded sensor data. The appropriate recovery behavior likely is to retry navigation? Or reverse and replan? Let's think: In behavior trees for recovery, if sensor data is intermittent, maybe need to retry navigation using available data, or maybe reverse and replan to avoid dead end. The question: "Choose exactly one action: RETRY_NAVIGATION | REVERSE_AND_REPLAN | HALT". Which is appropriate? The fault is intermittent LiDAR, but navigation data is partially available. The robot should attempt to retry navigation using available data, maybe with fallback. I think RETRY_NAVIGATION is appropriate: try again using partial data. REVERSE_AND_REPLAN might be used if stuck, but not necessarily. HALT would stop, not needed. So choose RETRY_NAVIGATION.
+demo-1  | 
+demo-1  | Thus output:
+demo-1  | 
+demo-1  | RETRY_NAVIGATION
+demo-1  | 
+demo-1  | Then rationale: The intermittent LiDAR still provides occasional scans, so the robot can attempt another navigation pass rather than stopping or reversing immediately.
+demo-1  | 
+demo-1  | 
+demo-1  | [INFO] [1791562418.235435861] [diagnostics_agent_node]: === NEMOTRON DECISION: RETRY_NAVIGATION ===
+demo-1  | [INFO] [1791562418.238790301] [diagnostics_agent_node]: --- NEMOTRON RATIONALE: The robot can still use the sporadically received LiDAR scans to attempt another navigation cycle, making a retry the most suitable response while avoiding unnecessary stop or reversal. ---
+demo-1  | [INFO] [1791562444.400483030] [baseline_agent_node]: [BASELINE] fault cleared
+demo-1  | 
+demo-1  | ================ injecting fault: complete ================
+demo-1  | [INFO] [1791562447.585587530] [baseline_agent_node]: [BASELINE] severity=complete -> HALT
+demo-1  | [INFO] [1791562447.585734349] [diagnostics_agent_node]: === FAULT DETECTED: complete ===
+demo-1  | [INFO] [1791562446.644027118] [diagnostics_agent_node]: --- TAVILY CONTEXT --- 
+demo-1  | --> Running ROS 2 on a UBR-1 for autonomous navigation: One of the biggest changes in ROS 2 is the use of behavior trees to structure the recovery behaviors and connect the various action-based interfaces. This allows quite a bit of interesting new functionality, such as using different recovery behaviors for controller failures than are used for planning failures and allowing quite a bit of control over when to plan. There are already dozens of behavior tree nodes and there is also a new tutorial on writing custom behavior tree nodes. [...] One complication with a 3D sensor is the desire to use the floor plan for clearing the costmap, but not marking. A common approach for this is to set up two observation sources. The first source is set up to be the marking source and has a minimum obstacle height high enough to ignore most noise. A second source is set to be a clearing source and uses the full cloud. Since clearing sources are applied before marking sources, this works fine and won’t accidentally over clear: [...] One interesting find was that the sensor\_msgs/PointCloud message has been deprecated and slated for removal after Foxy. There are a number of places where the PointCloud interface was used a simple way to publish debug points (the message is simply an array of geometry\_msgs/Point32 instead of the much more complicated PointCloud2 messages which has a variable set of fields and pretty much requires the use of a modifier and iterator to really fill or read). I decided to get rid of the
+demo-1  | --> 32. ROS2-Autonomous Navigation Course | PuppyPi Documentation: The Nav2 project builds upon and extends the spirit of the ROS navigation stack. Its goal is to enable mobile robots to move safely from point A to point B. Nav2 can also be applied to other scenarios, including robot navigation and dynamic point tracking. During this process, tasks such as dynamic path planning, motor speed calculation, obstacle avoidance, and recovery behaviors need to be completed. [...] ③ Recovery Server: The Recovery Server acts as a fault-tolerant system. Its goal is to handle unexpected situations or failures and autonomously resolve these issues. For example, if the robot falls into a pit during navigation, the recovery server helps it find a way to recover and continue its task. [...] Nav2 uses behavior trees to call modular servers to perform actions. These actions may include path computation, force control, recovery, or any other navigation-related tasks. These actions are executed through independent nodes that communicate with the behavior tree (BT) via ROS Action servers. The diagram below provides an overview of Nav2's architecture:
+demo-1  | 
+demo-1  | The above architecture can be broadly divided into one major component and three smaller components.
+demo-1  | 
+demo-1  | (1) The Major Component:
+demo-1  | --> ROS-Based Navigation and Obstacle Avoidance: A Study of Architectures, Methods, and Trends: obstacle-avoidance control, and recovery behaviours. This architecture provides a complete closed-loop system that supports autonomous navigation in mobile robots . [...] The Dynamic Window Approach (DWA) is widely employed in low-to-medium-speed autonomous navigation tasks, due to its low computational cost and strong real-time performance. As demonstrated in the study by Anh-Tu Nguyen et al. , the ROS-based implementation of DWA, when integrated with 2D grid costmaps and LiDAR sensors, can effectively avoid both static and moderately dynamic obstacles. The experimental results have confirmed that this method offers reliable real-time responsiveness and low
+demo-1  | 
+demo-1  | [INFO] [1791562447.837267339] [diagnostics_agent_node]: --- NEMOTRON REASONING --- 
+demo-1  | We need to choose exactly one action: RETRY_NAVIGATION | REVERSE_AND_REPLAN | HALT. Provide rationale in one or two sentences after that line. The context: mobile robot navigating confined tunnel has LiDAR fault severity: complete (no scan data). So robot cannot perceive obstacles. In such case, likely need to halt to avoid collision. Or maybe reverse and replan? But with no LiDAR data, cannot safely navigate. The best is HALT. Provide rationale: robot must stop because sensor data unavailable, cannot safely navigate. So answer: HALT then rationale.
+demo-1  | 
+demo-1  | 
+demo-1  | [INFO] [1791562447.837719436] [diagnostics_agent_node]: === NEMOTRON DECISION: HALT ===
+demo-1  | [INFO] [1791562447.838202524] [diagnostics_agent_node]: --- NEMOTRON RATIONALE: The robot has lost all LiDAR input, so it cannot safely perceive obstacles or navigate; stopping prevents potential collisions while a solution can be devised. ---
+demo-1  | [INFO] [1791562476.208315869] [baseline_agent_node]: [BASELINE] fault cleared
+demo-1  | 
+demo-1  | ================ demo finished ================
+[Kdemo-1 exited with code 0

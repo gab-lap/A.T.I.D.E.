@@ -1,0 +1,6 @@
+# Agent-only demo: diagnostics agent + hardcoded baseline in one container.
+# Usage: cp .env.example .env  (add your keys), then: docker compose up --build
+services:
+  demo:
+    build: .
+    env_file: .env          # keys are injected at runtime, never baked into the image

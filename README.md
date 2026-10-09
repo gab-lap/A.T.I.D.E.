@@ -41,26 +41,27 @@ than opaque.
 - **TurtleBot3 Waffle** - simulated rover platform
 - **Python** (agent) + **C++** (fault trigger, recovery executor)
 
-<!-- ## Status
-
+## Status
+ 
 | Component | Status |
 |---|---|
 | Gazebo tunnel world + rover spawn | **OK** - Working |
 | ROS 2 to Gazebo bridge (`/scan`, `/odom`, `/cmd_vel`, `/tf`, `/clock`) | **OK** - Verified with `ros2 topic hz` |
-| Fault injection node (`atide_fault_trigger`) | **OK** - Built, tested with manual parameter toggle |
+| Fault injection node (`atide_fault_trigger`) | **OK** - Modes `none`, `intermittent`, `complete`, set live with `ros2 param set` |
 | Nav2 autonomous navigation | **OK** - Sequential goals verified end to end |
-| Diagnostics agent (`atide_diagnostics_agent`) | **OK** - Full pipeline: Tavily, Nemotron, reasoning trace, vocabulary validation, HALT fallback |
-| Diagnostics agent - end-to-end test with faked fault | **OK** - Verified, 13 runs across both severities |
-| Recovery executor | Not yet written |
-| Hardcoded baseline | Not yet written |
-| Integrated demo (agent + executor + baseline + sim) | Not yet assembled |
-
+| Diagnostics agent (`atide_diagnostics_agent`) | **OK** - Tavily retrieval, Nemotron reasoning, reasoning trace, vocabulary validation, HALT fallback |
+| Diagnostics agent - faked-fault test | **OK** - 13 runs across both severities |
+| Recovery executor (`atide_recovery_executor`) | **OK** - `HALT`, `RETRY_NAVIGATION` and `REVERSE_AND_REPLAN` verified end to end in simulation |
+| Hardcoded baseline (`baseline_agent_node`) | **OK** - any fault -> `HALT`, publishes to `/baseline_decision` <!-- VERIFY: only after the side-by-side test --> |
+| Containerized agent demo (no simulator) | **OK** - `docker compose up --build` <!-- VERIFY: only after building and running it on a clean machine/folder --> |
+| Single-command launch of the full stack | Not yet - runs as separate terminals (see Run) |
+ 
 *Test results: across the verification runs, `intermittent` faults produce a recovery action
 (`RETRY_NAVIGATION` or `REVERSE_AND_REPLAN`) in the large majority of cases; `complete` faults produce
 `HALT` in the large majority of cases. The one anomalous case was a prompt-format variation (the model
 echoed the prompt's line label into its answer) that was caught by the vocabulary validator and safely
 downgraded to `HALT`; the prompt template was subsequently tightened to remove the ambiguity, and the
-anomaly has not recurred.* -->
+anomaly has not recurred.*
 
 ## How I used Nemotron
 
@@ -147,62 +148,110 @@ judgment.
       |   or publish /cmd_vel)       |
       +------------------------------+
 ```
-<!-- 
 ## Setup
-
+ 
+There are two ways to run A.T.I.D.E.
+ 
+- **Full simulation** (Gazebo + Nav2 + the whole pipeline): native install, described below. This is what
+  the demo video shows.
+- **Agent demo, no simulator** (Tavily + Nemotron + baseline, in one container): see
+  [Quick demo with Docker](#quick-demo-with-docker). Fastest way to see the reasoning for yourself.
+### Requirements
+ 
+- Ubuntu 24.04 with ROS 2 Jazzy, Gazebo Harmonic and Nav2 installed
+- A Nebius Token Factory API key and a Tavily API key (both have free tiers)
+### Build
+ 
 ```bash
-# Assumes ROS 2 Jazzy + Gazebo Harmonic + Nav2 already installed
+mkdir -p ~/atide_ws/src && cd ~/atide_ws/src
 git clone https://github.com/gab-lap/A.T.I.D.E.
 cd A.T.I.D.E.
-
-# Python dependencies for the diagnostics agent
-# Installed to the user site-packages. ROS 2's build system expects the
-# system Python, and an isolated venv breaks the shebang chain used by
-# colcon build and ros2 run.
+ 
+# Python dependencies for the diagnostics agent.
+# Installed to the user site-packages: ROS 2's build tools expect the system Python, and an isolated
+# venv breaks the shebang chain used by colcon build and ros2 run.
 pip3 install --user --break-system-packages -r requirements.txt
-
-# Add your Nebius + Tavily API keys
+ 
+# Add your API keys
 cp .env.example .env
-# edit .env with your keys (both free tiers work)
-
-# Build the workspace
+# edit .env with your Nebius and Tavily keys
+ 
+# Install ROS dependencies and build
+cd ~/atide_ws
+rosdep install --from-paths src --ignore-src -r -y   # VERIFY: package.xml dependencies are complete
 colcon build --symlink-install
 source install/setup.bash
-
-# Launch the simulation
+```
+ 
+### Run
+ 
+Use one terminal per line. In every terminal, run `source ~/atide_ws/install/setup.bash` first.
+ 
+```bash
+# 1. Simulation + Nav2
 ros2 launch atide_bringup simulation.launch.py
-```
-
-In a second terminal, trigger a fault manually:
-
-```bash
-source install/setup.bash
-ros2 param set /fault_trigger_node fault_mode intermittent
-```
-
-To run the diagnostics agent standalone (without the full simulation):
-
-```bash
+ 
+# 2. Recovery executor
+ros2 run atide_recovery_executor recovery_executor_node --ros-args -p use_sim_time:=true
+ 
+# 3. Diagnostics agent (the explicit env_file path matters, see note below)
 ros2 run atide_diagnostics_agent diagnostics_agent_node --ros-args \
-  -p env_file:=$(pwd)/.env
+  -p env_file:=$HOME/atide_ws/src/A.T.I.D.E./.env
+ 
+# 4. Hardcoded baseline (comparison only, the executor ignores it)
+ros2 run atide_diagnostics_agent baseline_agent_node
+ 
+# 5. Inject a fault while the rover is driving
+ros2 param set /fault_trigger_node fault_mode intermittent   # or: complete, none
 ```
-
-Watch the agent's terminal. The full reasoning trace, the retrieved context, and the final decision
-appear there, and the decision is republished on `/recovery_decision`.
-
+ 
+Watch terminal 3. The retrieved Tavily context, the Nemotron reasoning trace and the final decision
+appear there, and the decision is republished on `/recovery_decision`. Terminal 4 shows what the
+hardcoded rule would have done instead.
+ 
+**Why `env_file` is passed explicitly.** After `colcon build`, the executed file lives under `build/`,
+which is a sibling of `src/`, not a parent. `load_dotenv()` searches upward from the executed file and
+never reaches the `.env` in the repository.
+ 
+**If the terminal fills with `Detected jump back in time`:** an orphan `ros_gz_bridge` from a previous
+run is publishing a second `/clock`. Kill leftovers before relaunching:
+ 
+```bash
+pkill -9 -f "gz sim"; pkill -9 -f ros_gz_bridge; pkill -9 -f rviz2; pkill -9 -f component_container
+```
+ 
+## Quick demo with Docker
+ 
+No simulator, no GPU, no ROS installation needed, only Docker and your API keys. The container runs the
+diagnostics agent and the baseline together, injects an `intermittent` and then a `complete` fault, and
+prints both nodes' output in one terminal: the baseline answers `HALT` instantly, the agent searches,
+reasons, and then decides. <!-- VERIFY: whole section -->
+ 
+```bash
+git clone https://github.com/gab-lap/A.T.I.D.E.
+cd A.T.I.D.E.
+cp .env.example .env      # add your Nebius and Tavily keys
+docker compose up --build
+```
+ 
+The recovery executor and Nav2 are not part of this container: it demonstrates the decision layer only.
+The full closed loop (decision -> executor -> rover) is the native setup above.
+ 
 ## What's next
-
-- **Recovery Executor** - consumes `/recovery_decision` and translates it into Nav2 goal cancel/resend
-  or direct `/cmd_vel` commands. This closes the loop: reasoning that doesn't act is not recovery.
-- **Hardcoded baseline** - runs the same fault scenario with a trivial rule (`any fault -> HALT`) so the
-  demo can show the two side by side.
-- **Concurrency note.** The Diagnostics Agent's Tavily and Nemotron calls run synchronously in the
+ 
+- **Evaluation at scale on Nebius Serverless Jobs.** The same container image can run as a batch job that
+  injects many fault scenarios and tabulates the decision distribution, replacing the current manual
+  13-run test with a statistically meaningful one.
+- **Full-simulation container.** Gazebo, Nav2 and the pipeline in one image, run headless with a browser
+  desktop for RViz, so the whole closed loop needs only Docker.
+- **Single launch file** for simulation, executor, agent and baseline.
+- **Concurrency note.** The diagnostics agent's Tavily and Nemotron calls run synchronously in the
   subscription callback. This is fine for the current single-subscription design, since nothing else
-  competes for the callback thread. A second input (e.g., an operator chat topic) or a heartbeat timer
-  would require moving the API calls off the callback thread.
-- **Hardware-in-the-loop extension** (post-core) - a physical hexapod executing the same
-  `/recovery_decision` vocabulary over its existing wireless link, as physical proof the decision
-  vocabulary generalizes beyond the simulated rover. -->
+  competes for the callback thread. A second input (for example an operator chat topic) or a heartbeat
+  timer would require moving the API calls off the callback thread.
+- **Hardware-in-the-loop extension** - a physical hexapod executing the same `/recovery_decision`
+  vocabulary over its existing wireless link, as physical proof that the decision vocabulary generalizes
+  beyond the simulated rover.
 
 ## License
 
