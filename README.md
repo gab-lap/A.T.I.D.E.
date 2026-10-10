@@ -52,16 +52,14 @@ than opaque.
 | Diagnostics agent (`atide_diagnostics_agent`) | **OK** - Tavily retrieval, Nemotron reasoning, reasoning trace, vocabulary validation, HALT fallback |
 | Diagnostics agent - faked-fault test | **OK** - 13 runs across both severities |
 | Recovery executor (`atide_recovery_executor`) | **OK** - `HALT`, `RETRY_NAVIGATION` and `REVERSE_AND_REPLAN` verified end to end in simulation |
-| Hardcoded baseline (`baseline_agent_node`) | **OK** - any fault -> `HALT`, publishes to `/baseline_decision` <!-- VERIFY: only after the side-by-side test --> |
-| Containerized agent demo (no simulator) | **OK** - `docker compose up --build` <!-- VERIFY: only after building and running it on a clean machine/folder --> |
+| Hardcoded baseline (`baseline_agent_node`) | **OK** - any fault -> `HALT`, publishes to `/baseline_decision`; side-by-side test passed |
+| Containerized agent demo (no simulator) | **OK** - `docker compose up` exits 0, both nodes print side by side |
+| Containerized evaluation harness (`docker/eval_harness.py`) | **OK** - 20 runs across both severities, table in Evaluation below |
 | Single-command launch of the full stack | Not yet - runs as separate terminals (see Run) |
  
-*Test results: across the verification runs, `intermittent` faults produce a recovery action
-(`RETRY_NAVIGATION` or `REVERSE_AND_REPLAN`) in the large majority of cases; `complete` faults produce
-`HALT` in the large majority of cases. The one anomalous case was a prompt-format variation (the model
-echoed the prompt's line label into its answer) that was caught by the vocabulary validator and safely
-downgraded to `HALT`; the prompt template was subsequently tightened to remove the ambiguity, and the
-anomaly has not recurred.*
+*Test results: see [Evaluation](#evaluation) below for the reproducible run. In summary: intermittent
+LiDAR faults produce a recovery action in 8 of 10 runs and `HALT` in 2; complete LiDAR failures produce
+`HALT` in 10 of 10. The baseline produces `HALT` in 20 of 20, regardless of severity.*
 
 ## How I used Nemotron
 
@@ -122,31 +120,33 @@ judgment.
     | /scan_filtered |                +--------+---------+
     | /fault_severity|                       |
     +------+---------+                       | /cmd_vel
-             |                               v
-             |                       +--------------+
-             |                       |  Gazebo      |
-             |                       |  diff-drive  |
-             |                       +--------------+
-             |
-             v
-      +------------------------------------------+
-      |  Diagnostics Agent                       |
-      |                                          |
-      |   /fault_severity ->                     |
-      |     Tavily search ->                     |
-      |     Nemotron reasoning ->                |
-      |     vocabulary validation ->             |
-      |   /recovery_decision                     |
-      |   /recovery_rationale                    |
-      |   /reasoning_trace                       |
-      +------------------+-----------------------+
-                         |
-                         v
-      +------------------------------+
-      |  Recovery Executor           |
-      |  (cancel / resend Nav2 goal, |
-      |   or publish /cmd_vel)       |
-      +------------------------------+
+           |                                 v
+           |                         +--------------+
+           |                         |  Gazebo      |
+           |                         |  diff-drive  |
+           |                         +--------------+
+           |
+           +----------------------------------------------+
+           |                                              |
+           v                                              v
+  +------------------------------------------+   +--------------------------------------+
+  |  Diagnostics Agent                       |   |  Hardcoded baseline                  |
+  |                                          |   |                                      |
+  |   /fault_severity ->                     |   |   /fault_severity ->                 |
+  |     Tavily search ->                     |   |     /baseline_decision               |
+  |     Nemotron reasoning ->                |   |   any fault -> HALT                  |
+  |     vocabulary validation ->             |   |   (comparison only, not wired to the |
+  |   /recovery_decision                     |   |    recovery executor)                |
+  |   /recovery_rationale                    |   |                                      |
+  |   /reasoning_trace                       |   |                                      |
+  +------------------+-----------------------+   +--------------------------------------+
+                     |
+                     v
+  +------------------------------+
+  |  Recovery Executor           |
+  |  (cancel / resend Nav2 goal, |
+  |   or publish /cmd_vel)       |
+  +------------------------------+
 ```
 ## Setup
  
@@ -225,7 +225,7 @@ pkill -9 -f "gz sim"; pkill -9 -f ros_gz_bridge; pkill -9 -f rviz2; pkill -9 -f 
 No simulator, no GPU, no ROS installation needed, only Docker and your API keys. The container runs the
 diagnostics agent and the baseline together, injects an `intermittent` and then a `complete` fault, and
 prints both nodes' output in one terminal: the baseline answers `HALT` instantly, the agent searches,
-reasons, and then decides. <!-- VERIFY: whole section -->
+reasons, and then decides.
  
 ```bash
 git clone https://github.com/gab-lap/A.T.I.D.E.
@@ -237,11 +237,38 @@ docker compose up --build
 The recovery executor and Nav2 are not part of this container: it demonstrates the decision layer only.
 The full closed loop (decision -> executor -> rover) is the native setup above.
  
+## Evaluation
+
+`docker/eval_harness.py` injects each severity N times, waits for `/recovery_decision` with a timeout,
+and tabulates decisions and latency. It depends only on `/fault_severity` and `/recovery_decision`, not
+on the agent's internals. Run it against the container:
+
+```bash
+docker compose run --rm -e RUNS=10 demo bash /ws/src/A.T.I.D.E./docker/eval.sh
+```
+
+Results from a 10-run × 2-severity run, no GPU, CPU-only container:
+
+| severity | runs | HALT | REVERSE_AND_REPLAN | median latency (s) |
+|---|---|---|---|---|
+| intermittent | 10 | 2 | 8 | 4.2 |
+| complete | 10 | 10 | 0 | 4.2 |
+
+The agent selects a recovery action for intermittent faults in 8 of 10 runs and `HALT` in the remaining
+2. For complete LiDAR failure it selects `HALT` in 10 of 10. The hardcoded baseline emits `HALT` in all
+20 runs. Median decision latency is 4.2 s, well inside a robot's recovery budget, on a CPU-only
+container with no GPU.
+
+**Two things this table does not distinguish.** The harness cannot tell a validator fallback (`HALT`
+because the model returned an out-of-vocabulary string) from a genuine `HALT` decision, because both
+arrive on the same topic. And the agent never selected `RETRY_NAVIGATION` in these 20 runs: its prior
+favors a conservative replan over a naive retry. Both points are visible in the code, not hidden.
+
 ## What's next
  
-- **Evaluation at scale on Nebius Serverless Jobs.** The same container image can run as a batch job that
-  injects many fault scenarios and tabulates the decision distribution, replacing the current manual
-  13-run test with a statistically meaningful one.
+- **Evaluation at scale on Nebius Serverless Jobs.** The same image runs as a batch job against the same
+  harness, replacing the 20-run local evaluation with a larger one. The image, the harness and the
+  environment-variable interface are already in place.
 - **Full-simulation container.** Gazebo, Nav2 and the pipeline in one image, run headless with a browser
   desktop for RViz, so the whole closed loop needs only Docker.
 - **Single launch file** for simulation, executor, agent and baseline.
