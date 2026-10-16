@@ -11,6 +11,7 @@ are ROS 2 parameters, so the same node works against any robot that
 publishes a fault-severity string, not just this project's rover.
 """
 import os
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -19,6 +20,8 @@ from std_msgs.msg import String
 from dotenv import load_dotenv
 from openai import OpenAI
 from tavily import TavilyClient
+
+from atide_diagnostics_agent.fault_context import format_context_block, parse_context
 
 
 class DiagnosticsAgentNode(Node):
@@ -33,6 +36,12 @@ class DiagnosticsAgentNode(Node):
         
         self.model = self.declare_parameter('model', 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B').value
         self.temperature = self.declare_parameter('temperature', 0.1).value
+
+        # --- Optional extras. All off by default, so default behaviour (and the prompt) is unchanged ---
+        self.use_context = self.declare_parameter('use_context', False).value
+        self.context_topic = self.declare_parameter('context_topic', '/fault_context').value
+        self.context_max_age_s = self.declare_parameter('context_max_age_s', 5.0).value
+        self.use_tavily = self.declare_parameter('use_tavily', True).value
 
         self.env_path = self.declare_parameter('env_file', '').value
 
@@ -58,6 +67,8 @@ class DiagnosticsAgentNode(Node):
 
         # --- Publishers and Subscribers ---
         self.severity_sub = self.create_subscription(String, self.severity_topic, self.on_severity, 10)
+        if self.use_context:
+            self.context_sub = self.create_subscription(String, self.context_topic, self.on_context, 10)
 
         self.decision_pub = self.create_publisher(String, self.decision_topic, 10)
         self.rationale_pub = self.create_publisher(String, '/recovery_rationale', 10)   # For the visual Demo
@@ -66,9 +77,12 @@ class DiagnosticsAgentNode(Node):
         # --- State ---
         self.last_severity = 'none'
         self.decision_in_flight = False
+        self.latest_context = None      # (FaultContext, monotonic time received)
 
         self.get_logger().info(f'Diagnostics agent Node up. Model: {self.model}, '
                                f'Vocabulary: {self.vocabulary}, Watching: {self.severity_topic}')
+        if self.use_context or not self.use_tavily:
+            self.get_logger().info(f'Options: use_context={self.use_context}, use_tavily={self.use_tavily}')
 
 
     def on_severity(self, msg: String):
@@ -92,6 +106,32 @@ class DiagnosticsAgentNode(Node):
         self.handle_fault(severity)
 
         
+    def on_context(self, msg: String):
+        """
+        Stores the latest validated operating context (numbers only, see fault_context.py)
+        """
+
+        ctx = parse_context(msg.data)
+        if ctx is not None:
+            self.latest_context = (ctx, time.monotonic())
+
+
+    def take_context(self):
+        """
+        Returns the latest operating context if it is fresh, and clears it either way (one-shot),
+        so a context can never leak into a later, unrelated decision
+        """
+
+        if not self.use_context or self.latest_context is None:
+            return None
+        ctx, received = self.latest_context
+        self.latest_context = None
+        if time.monotonic() - received > self.context_max_age_s:
+            self.get_logger().warn('Operating context is stale - ignoring it')
+            return None
+        return ctx
+
+
     def handle_fault(self, severity: str):
         """
         Handles faults querying Tavily and Nemotron
@@ -102,10 +142,18 @@ class DiagnosticsAgentNode(Node):
         try:
             self.get_logger().info(f'=== FAULT DETECTED: {severity} ===')
 
-            context = self.retrieve_contex(severity)
+            ctx = self.take_context()
+            if ctx is not None:
+                self.get_logger().info(f'--- OPERATING CONTEXT ---\n'
+                                       f'{format_context_block(ctx, with_instruction=False)}\n')
+
+            if self.use_tavily:
+                context = self.retrieve_contex(severity)
+            else:
+                context = '(no context retrieved)'      # same text as the empty-search fallback
             self.get_logger().info(f'--- TAVILY CONTEXT --- \n{context}\n')
 
-            reasoning, decision, rationale = self.query_model(severity, context)
+            reasoning, decision, rationale = self.query_model(severity, context, ctx)
             self.get_logger().info(f'--- NEMOTRON REASONING --- \n{reasoning}\n')
             self.get_logger().info(f'=== NEMOTRON DECISION: {decision} ===')
             self.get_logger().info(f'--- NEMOTRON RATIONALE: {rationale} ---')
@@ -136,19 +184,22 @@ class DiagnosticsAgentNode(Node):
         return '\n'.join(chunks) if chunks else '(no context retrieved)'
 
 
-    def query_model(self, severity: str, context: str):
+    def query_model(self, severity: str, context: str, ctx=None):
         """
         Queries Nemotron and retrieves a decision (among the ones in the vocabulary),
         the reasoning (thought process) and the rationale
         """
 
         options = ' | '.join(self.vocabulary)
+        block = format_context_block(ctx)
+        context_section = f'{block}\n\n' if block else ''
         prompt = (
             f'A mobile robot navigating a confined tunnel has a LiDAR fault.\n'
             f'Fault severity: {severity}\n'
             f'  - "intermittent" means scans arrive sparsely but navigation data '
             f'is partially available.\n'
             f'  - "complete" means no scan data at all.\n\n'
+            f'{context_section}'
             f'Retrieved ROS 2 guidance:\n{context}\n\n'
             f'Choose exactly one action: {options}\n\n'
             f'Your response must start with exactly one action on its own line, '

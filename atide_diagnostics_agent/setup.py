@@ -29,6 +29,7 @@ setup(
         'console_scripts': [
             'diagnostics_agent_node = atide_diagnostics_agent.diagnostics_agent_node:main',
             'baseline_agent_node = atide_diagnostics_agent.baseline_agent_node:main',
+            'fault_context_node = atide_diagnostics_agent.fault_context_node:main',
         ],
     },
 )

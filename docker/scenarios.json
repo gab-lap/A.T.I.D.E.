@@ -1,0 +1,32 @@
+[
+  {
+    "name": "baseline-no-context",
+    "severity": "intermittent",
+    "context": null,
+    "hypothesis": "No context is sent, so the agent behaves as in the frozen 30-run table (26 REVERSE_AND_REPLAN / 4 RETRY_NAVIGATION / 0 HALT). This is the control."
+  },
+  {
+    "name": "open-corridor-slow",
+    "severity": "intermittent",
+    "context": {"nearest_obstacle_m": 3.4, "obstacle_data_age_s": 1.0, "speed_mps": 0.05, "distance_to_goal_m": 12.0, "fault_duration_s": 0.0},
+    "hypothesis": "RETRY_NAVIGATION is chosen more often than in the control: lots of free space ahead and the robot is crawling."
+  },
+  {
+    "name": "obstacle-close-moving",
+    "severity": "intermittent",
+    "context": {"nearest_obstacle_m": 0.4, "obstacle_data_age_s": 1.0, "speed_mps": 0.22, "distance_to_goal_m": 12.0, "fault_duration_s": 0.0},
+    "hypothesis": "More cautious than the control: HALT or REVERSE_AND_REPLAN, RETRY_NAVIGATION almost never."
+  },
+  {
+    "name": "persistent-fault",
+    "severity": "intermittent",
+    "context": {"nearest_obstacle_m": 3.0, "obstacle_data_age_s": 25.0, "speed_mps": 0.05, "distance_to_goal_m": 12.0, "fault_duration_s": 30.0},
+    "hypothesis": "RETRY_NAVIGATION is rarer than in the control: a 30 s fault is not a brief glitch and the obstacle reading is 25 s old."
+  },
+  {
+    "name": "complete-near-goal",
+    "severity": "complete",
+    "context": {"nearest_obstacle_m": 5.0, "obstacle_data_age_s": 2.0, "speed_mps": 0.05, "distance_to_goal_m": 1.0, "fault_duration_s": 0.0},
+    "hypothesis": "Still HALT in nearly every run: with no sensing at all, being close to the goal should not change that."
+  }
+]
