@@ -100,7 +100,7 @@ controller_server:
     # Controller 1 — RPP
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.5
+      desired_linear_vel: 0.20
       lookahead_dist: 0.6
       use_velocity_scaled_lookahead_dist: false
       min_approach_linear_velocity: 0.05
