@@ -1,15 +1,13 @@
 # A.T.I.D.E. - Autonomous & Teleoperated Intervention in Degraded Environments
 
-An agent runtime for autonomous rover fault recovery: a ROS 2 / Gazebo navigation pipeline that detects
-sensor faults live, reasons about the best recovery action using retrieval-augmented LLM reasoning, and
+An agent runtime for autonomous rover fault recovery: A ROS 2 / Gazebo navigation pipeline that responds to sensor faults live, 
+reasons about the best recovery action using retrieval-augmented LLM reasoning, and
 acts on that decision, with the reasoning itself surfaced, not hidden.
 
 Built for the [Nebius x NVIDIA Global AI Hackathon](https://nebiusglobalaihackathon.devpost.com/)
 (Physical AI Track).
 
-<!-- Demo video: uncomment and fill in once uploaded
-**Demo video:** [YouTube link](https://www.youtube.com/watch?v=...)
--->
+**Demo video:** [YouTube link](https://youtu.be/XYWM9gZnYjU)
 
 ## The problem
 
@@ -108,9 +106,7 @@ results, and embeds them into the Nemotron prompt as grounding.
 **Why runtime retrieval matters here.** ROS 2 fault-recovery best practices evolve, new QoS patterns,
 new Nav2 recovery server configurations, new diagnostic approaches. A static prompt would encode the
 model's training-data snapshot from an arbitrary point in the past. Tavily gives the agent *current*
-guidance on every decision, and the reasoning trace visibly references what was retrieved. Without the
-Tavily call, the prompt has no grounding in current practice; the decision is a guess dressed as a
-judgment.
+guidance on every decision, and the reasoning trace visibly references what was retrieved.
 
 **Does retrieval change the decision?** I ran the same harness with the Tavily search switched off
 (`docker/eval_notavily.sh`; same model, temperature and prompt, with the guidance slot reading
@@ -125,6 +121,7 @@ dropout. Retrieval also costs time: the median fault-to-decision latency was 5.7
 without.
 
 ## Architecture
+![Architecture](docs/architecture.jpg)
 
 ```
                     +------------------+
@@ -290,6 +287,8 @@ The full closed loop (decision -> executor -> rover) is the native setup above.
 
 ## Evaluation
 
+![Evaluation Results](docs/results.jpg)
+
 `docker/eval_harness.py` injects each severity N times, waits for `/recovery_decision` with a timeout,
 and tabulates decisions and latency. It depends only on `/fault_severity` and `/recovery_decision`, not
 on the agent's internals. Run it against the container:
@@ -387,9 +386,6 @@ The ablation and the baseline were run on different days.
   subscription callback. This is fine for the current single-subscription design, since nothing else
   competes for the callback thread. A second input (for example an operator chat topic) or a heartbeat
   timer would require moving the API calls off the callback thread.
-- **Hardware-in-the-loop extension** - a physical hexapod executing the same `/recovery_decision`
-  vocabulary over its existing wireless link, as physical proof that the decision vocabulary generalizes
-  beyond the simulated rover.
 
 ## License
 
