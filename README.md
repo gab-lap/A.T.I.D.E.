@@ -7,6 +7,8 @@ acts on that decision, with the reasoning itself surfaced, not hidden.
 Built for the [Nebius x NVIDIA Global AI Hackathon](https://nebiusglobalaihackathon.devpost.com/)
 (Physical AI Track).
 
+**Submission & Media:** [See the full Devpost page, gallery, and video](https://devpost.com/software/a-t-i-d-e-rover-fault-diagnostics-agent)
+
 **Demo video:** [YouTube link](https://youtu.be/XYWM9gZnYjU)
 
 ## The problem
